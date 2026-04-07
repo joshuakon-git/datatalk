@@ -45,8 +45,8 @@ With the demo sales dataset loaded:
 2. Pandas reads the file and auto-detects column names and data types
 3. Data is loaded into a SQLite table dynamically
 4. User submits a question in plain English
-5. The schema and sample rows are sent to OpenAI with a structured
-   prompt asking for a SQL query and chart type
+5. A first OpenAI call converts the question to SQL and detects
+   the appropriate chart type
 6. The SQL runs against SQLite and results are returned
 7. A second OpenAI call generates a plain English explanation
    grounded in the actual query results
@@ -59,6 +59,10 @@ With the demo sales dataset loaded:
 - **Two-stage AI pipeline** separates SQL generation from explanation
   generation, ensuring the explanation always references real query
   results rather than hallucinated data.
+- **Question intent detection** distinguishes ranking questions
+  ("which month had the highest margin?") from display questions
+  ("show revenue by month"), adjusting the headline and explanation
+  style accordingly.
 - **Smart column selection** prioritises percentage and margin columns
   when multiple numeric columns are returned, so charts always display
   the most meaningful metric.
