@@ -26,6 +26,10 @@ and get answers with automatic chart visualisation.
 - Upload any CSV file — no formatting required
 - Ask questions in plain English ("Which product had the
   highest revenue in Q3?")
+- Calculates derived metrics dynamically — ask about profit margin,
+  return rates, or revenue per unit even if those columns don't exist
+  in your CSV. The AI generates the formula and runs it against your
+  raw data automatically.
 - OpenAI converts the question to SQL and runs it against your data
 - Results displayed as bar, line, or pie charts where relevant,
   or as a table for complex queries
@@ -35,10 +39,12 @@ and get answers with automatic chart visualisation.
 ## Example questions
 
 With the demo sales dataset loaded:
-- "What month had the highest profit margin?"
+- "What month had the highest profit margin?" *(calculated dynamically
+  from revenue and cost columns)*
 - "Which product generated the most revenue?"
 - "Show total revenue by month"
-- "What is the return rate by product?"
+- "What is the return rate by product?" *(calculated dynamically
+  from returns and units sold)*
 - "Compare revenue across regions"
 - "Which channel performed better, online or retail?"
 
@@ -78,6 +84,10 @@ With the demo sales dataset loaded:
 - **Smart column selection** prioritises percentage and margin columns
   when multiple numeric columns are returned, so charts always display
   the most meaningful metric.
+- **Dynamic metric calculation** means users are not limited to columns
+  that exist in their data. The AI understands analytical intent and
+  writes SQL that computes derived metrics such as profit margin,
+  return rate, and growth percentages from raw revenue and cost columns.
 - **GPT-4o-mini** was chosen over GPT-4o for cost efficiency.
   For a data query tool, the smaller model performs well.
 - **Session-based state** stores the schema and query history
