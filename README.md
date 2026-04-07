@@ -147,6 +147,7 @@ datatalk/
 │   └── dashboard.html  # Query and results page
 ├── uploads/            # Temporary CSV storage
 └── instance/           # SQLite database (auto-generated)
+```
 
 ## Limitations and future improvements
 
