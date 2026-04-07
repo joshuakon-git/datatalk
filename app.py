@@ -5,7 +5,6 @@ import pandas as pd
 from flask import (Flask, render_template, request,
                    redirect, url_for, session, jsonify)
 from openai import OpenAI
-from pandas import col
 from config import Config
 from demo_data import DEMO_CSV
 
@@ -125,55 +124,72 @@ def dashboard():
 def query():
     if 'schema' not in session:
         return jsonify({'error': 'No data loaded'}), 400
- 
+
     question = request.json.get('question', '').strip()
     if not question:
         return jsonify({'error': 'No question provided'}), 400
- 
+
     schema = session['schema']
     sample_rows = json.loads(session.get('sample_rows', '[]'))
     sample_str = json.dumps(sample_rows, indent=2, default=str)
- 
+
+    # Detect question intent upfront
+    ranking_keywords = ['highest', 'lowest', 'best', 'worst', 'most',
+                        'least', 'top', 'bottom', 'which', 'winner']
+    is_ranking_question = any(kw in question.lower() for kw in ranking_keywords)
+
     # First API call: generate SQL and chart metadata
     prompt = f"""You are a SQL and data analysis expert.
- 
+
 The user has uploaded a CSV file loaded into a SQLite table called 'user_data'.
- 
+
 Schema: {schema}
- 
+
 Sample rows:
 {sample_str}
- 
+
 The user asks: "{question}"
- 
+
 You MUST return a valid JSON object with EXACTLY these four fields, no exceptions:
- 
+
 1. "sql": a valid SQLite SELECT query. Important rules:
-   - For "which X had highest Y" questions, return ALL rows ordered by Y descending, not just the top 1
-   - For "highest" or "best" questions about time periods, return all periods ranked so the user can see the full picture
+   - For "which X had highest/lowest Y" questions, return ALL rows ordered by Y descending
+   - For "show X by Y" or "what is X by Y" questions, order by the label column ascending so charts read naturally left to right
    - Never use LIMIT unless the user explicitly asks for a specific number of results
    - Always use SELECT, never INSERT/UPDATE/DELETE/DROP
    - Column names must match the schema exactly
- 
-2. "answer_prefix": a single sentence introducing the answer. Example: "December 2024 had the highest profit margin at 60.3%."
- 
+   - Always include an explicit ORDER BY clause
+   - For profit margin questions, always calculate it as:
+     ROUND((SUM(revenue) - SUM(cost)) * 100.0 / SUM(revenue), 2) AS profit_margin
+     Never return raw profit as a substitute for margin percentage
+   - Always name percentage columns with 'margin', 'rate' or 'percent' 
+     in the column alias so they can be identified correctly
+
+2. "answer_prefix": a single sentence introducing the answer.
+   - For ranking questions: "December 2024 had the highest profit margin at 60.3%."
+   - For display questions: "Here is total revenue broken down by month."
+
 3. "chart_type": one of "line", "bar", "pie", "table"
- 
+   - Use "line" for time series data ordered chronologically
+   - Use "bar" for category comparisons
+   - Use "pie" for proportional breakdowns
+   - Use "table" for multi-column results
+
 4. "chart_label": what the chart is showing, max 8 words
- 
+
 If the question cannot be answered from this data, set sql to null and explain in answer_prefix.
- 
+
 Return ONLY the JSON object. No markdown, no backticks, no preamble."""
- 
+
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
- 
+
         result = json.loads(response.choices[0].message.content)
- 
+
         if not result.get('sql'):
             return jsonify({
                 'answer': result.get(
@@ -185,7 +201,7 @@ Return ONLY the JSON object. No markdown, no backticks, no preamble."""
                 'columns': [],
                 'rows': []
             })
- 
+
         # Run the SQL safely
         try:
             conn = get_db()
@@ -203,7 +219,7 @@ Return ONLY the JSON object. No markdown, no backticks, no preamble."""
                 'columns': [],
                 'rows': []
             })
- 
+
         if not rows:
             return jsonify({
                 'answer': 'No results found for that question.',
@@ -212,17 +228,19 @@ Return ONLY the JSON object. No markdown, no backticks, no preamble."""
                 'columns': [],
                 'rows': []
             })
- 
-        # Prefer columns with 'margin', 'percent', 'rate' in name
-        # Otherwise fall back to last numeric column
+
+        # Smart column selection - prefer margin/percent/rate columns
         priority_keywords = ['margin', 'percent', 'rate', 'pct', 'ratio']
 
         numeric_columns = [c for c in columns
-                  if any(isinstance(r.get(c), (int, float))
-                         for r in rows)]
+                          if any(isinstance(r.get(c), (int, float))
+                                 for r in rows)]
 
         def priority_score(col):
             col_lower = col.lower()
+            # Exact match gets highest score
+            if col_lower == 'profit_margin':
+                return 999
             for i, kw in enumerate(priority_keywords):
                 if kw in col_lower:
                     return len(priority_keywords) - i
@@ -230,58 +248,86 @@ Return ONLY the JSON object. No markdown, no backticks, no preamble."""
 
         priority_cols = [c for c in numeric_columns if priority_score(c) > 0]
         chart_value_col = (
-        max(priority_cols, key=priority_score)
-        if priority_cols
-        else (numeric_columns[-1] if numeric_columns else None)
+            max(priority_cols, key=priority_score)
+            if priority_cols
+            else (numeric_columns[-1] if numeric_columns else None)
         )
         chart_label_col = columns[0]
- 
-        # Always build answer from actual data, never trust AI summary
+
+        # Find the actual best row by chart_value_col for ranking questions
+        if is_ranking_question and rows and chart_value_col:
+            best_row = max(
+                rows,
+                key=lambda r: r.get(chart_value_col, 0)
+                if isinstance(r.get(chart_value_col), (int, float)) else 0
+            )
+        else:
+            best_row = rows[0]
+
+        # Build answer based on question type
         if rows and chart_value_col:
-            top_row = rows[0]
-            top_label = top_row.get(chart_label_col, '')
-            top_value = top_row.get(chart_value_col, '')
-            if isinstance(top_value, float):
-                top_value_str = f"{top_value:.2f}"
+            best_label = best_row.get(chart_label_col, '')
+            best_value = best_row.get(chart_value_col, '')
+            if isinstance(best_value, float):
+                best_value_str = f"{best_value:.2f}"
             else:
-                top_value_str = str(top_value)
-            answer = f"{top_label} had the highest {chart_value_col.replace('_', ' ')} at {top_value_str}."
+                best_value_str = str(best_value)
+
+            if is_ranking_question:
+                answer = (f"{best_label} had the highest "
+                         f"{chart_value_col.replace('_', ' ')} "
+                         f"at {best_value_str}.")
+            else:
+                answer = (f"Here is {chart_value_col.replace('_', ' ')} "
+                         f"broken down by {chart_label_col.replace('_', ' ')}.")
         else:
             answer = result.get('answer_prefix', 'Here are the results.')
- 
-        # Calculate top result string AFTER we have rows and chart_value_col
-        first_row = rows[0]
-        first_key = columns[0]
-        first_val = first_row.get(chart_value_col, '') if chart_value_col else ''
+
+        # Build top_result_str for explanation prompt
+        first_val = best_row.get(chart_value_col, '') if chart_value_col else ''
         if isinstance(first_val, float):
             first_val_str = f"{first_val:.2f}"
         else:
             first_val_str = str(first_val)
-        top_result_str = (
-            f"{first_row.get(first_key, '')} with "
-            f"{chart_value_col.replace('_', ' ') if chart_value_col else 'value'} "
-            f"of {first_val_str}"
-        )
- 
+
+        if is_ranking_question:
+            top_result_str = (
+                f"{best_row.get(chart_label_col, '')} with "
+                f"{chart_value_col.replace('_', ' ') if chart_value_col else 'value'} "
+                f"of {first_val_str}"
+            )
+            explanation_instruction = (
+                f"Write 2-3 sentences referencing {top_result_str} specifically. "
+                f"Explain what the metric means, how it was calculated, and include "
+                f"the actual figures for this result only. Do not reference other "
+                f"time periods unless making a direct comparison."
+            )
+        else:
+            top_result_str = (
+                f"all {chart_label_col.replace('_', ' ')}s showing "
+                f"{chart_value_col.replace('_', ' ') if chart_value_col else 'values'} "
+                f"across the full period"
+            )
+            explanation_instruction = (
+                f"Write 2-3 sentences describing the overall trend in the data. "
+                f"Mention the highest and lowest points by name and any notable "
+                f"patterns or changes over time. Use plain English."
+            )
+
         # Second API call: generate explanation from actual results
         explanation_prompt = f"""You are a data analyst explaining query results to a business user.
- 
+
 The user asked: "{question}"
- 
-The actual query results show the top result is: {top_result_str}
- 
-All results (ordered best to worst):
-{json.dumps(rows[:3], indent=2, default=str)}
- 
-Write a JSON object with one field:
-- "explanation": 2-3 sentences that reference {top_result_str} specifically.
-  Explain what the metric means, how it was calculated, and what the actual
-  numbers are for the top result only. Do not reference other time periods
-  or rows unless making a direct comparison. Use plain English suitable for
-  a non-technical business owner.
- 
-Return ONLY the JSON object."""
- 
+
+The actual query results are:
+{json.dumps(rows, indent=2, default=str)}
+
+{explanation_instruction}
+
+Return a JSON object with one field: "explanation"
+
+Return ONLY the JSON object. No markdown, no backticks, no preamble."""
+
         explanation_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": explanation_prompt}],
@@ -289,7 +335,7 @@ Return ONLY the JSON object."""
         )
         explanation_result = json.loads(
             explanation_response.choices[0].message.content)
- 
+
         # Add to history
         history = session.get('history', [])
         history.insert(0, {
@@ -299,7 +345,7 @@ Return ONLY the JSON object."""
         })
         session['history'] = history[:10]
         session.modified = True
- 
+
         return jsonify({
             'answer': answer,
             'explanation': explanation_result.get('explanation', ''),
@@ -310,7 +356,7 @@ Return ONLY the JSON object."""
             'columns': columns,
             'rows': rows
         })
- 
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -23,11 +23,12 @@ and get answers with automatic chart visualisation.
 ## Example questions
 
 With the demo sales dataset loaded:
-- "What was total revenue by month?"
-- "Which product made the most profit?"
-- "Show me revenue by region as a percentage"
-- "What was the best performing month overall?"
-- "Compare units sold across all four products"
+- "What month had the highest profit margin?"
+- "Which product generated the most revenue?"
+- "Show total revenue by month"
+- "What is the return rate by product?"
+- "Compare revenue across regions"
+- "Which channel performed better, online or retail?"
 
 ## Tech stack
 
@@ -45,14 +46,22 @@ With the demo sales dataset loaded:
 3. Data is loaded into a SQLite table dynamically
 4. User submits a question in plain English
 5. The schema and sample rows are sent to OpenAI with a structured
-   prompt asking for a SQL query and chart type recommendation
-6. The SQL query runs against SQLite and results are returned as JSON
-7. Chart.js renders the appropriate visualisation in the browser
+   prompt asking for a SQL query and chart type
+6. The SQL runs against SQLite and results are returned
+7. A second OpenAI call generates a plain English explanation
+   grounded in the actual query results
+8. Chart.js renders the appropriate visualisation in the browser
 
 ## Design decisions
 
 - **Schema auto-detection** means any well-formed CSV works without
   pre-formatting. Column names are cleaned and normalised on upload.
+- **Two-stage AI pipeline** separates SQL generation from explanation
+  generation, ensuring the explanation always references real query
+  results rather than hallucinated data.
+- **Smart column selection** prioritises percentage and margin columns
+  when multiple numeric columns are returned, so charts always display
+  the most meaningful metric.
 - **GPT-4o-mini** was chosen over GPT-4o for cost efficiency.
   For a data query tool, the smaller model performs well.
 - **Session-based state** stores the schema and query history

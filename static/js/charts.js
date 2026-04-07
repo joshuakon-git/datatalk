@@ -26,6 +26,12 @@ function submitQuestion(question) {
     resultSection.style.display = 'block';
     resultSection.classList.add('loading');
 
+    // Clear previous explanation immediately
+    const existingExplanation = document.getElementById('explanationText');
+    if (existingExplanation) existingExplanation.remove();
+    
+    document.getElementById('answerText').textContent = '';
+
     fetch('/query', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
