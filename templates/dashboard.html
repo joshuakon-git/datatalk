@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="dashboard">
+
+    <div class="data-summary">
+        <span>{{ summary.rows }} rows</span>
+        <span>{{ summary.column_count }} columns</span>
+        {% if summary.date_range %}
+            <span>{{ summary.date_range }}</span>
+        {% endif %}
+        <span class="cols">{{ summary.columns | join(', ') }}</span>
+        <a href="/" class="upload-new">Upload new file</a>
+    </div>
+
+    <div class="query-section">
+        <div class="query-box">
+            <input type="text" id="questionInput"
+                   placeholder="e.g. What was total revenue by month?"
+                   autocomplete="off">
+            <button id="askBtn" class="btn-primary">Ask</button>
+        </div>
+
+        <div class="suggestions">
+            <span>Try:</span>
+            <button class="suggestion"
+                onclick="askQuestion('What is the total revenue?')">
+                Total revenue</button>
+            <button class="suggestion"
+                onclick="askQuestion('Which product has the highest sales?')">
+                Top product</button>
+            <button class="suggestion"
+                onclick="askQuestion('Show revenue by month')">
+                Revenue by month</button>
+        </div>
+    </div>
+
+    <div id="resultSection" class="result-section" style="display:none">
+        <div class="spinner"></div>
+        <div id="answerText" class="answer-text"></div>
+        <div class="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+        <div id="tableContainer"></div>
+    </div>
+
+    {% if history %}
+    <div class="history">
+        <h3>Recent questions</h3>
+        {% for item in history %}
+        <div class="history-item"
+             onclick="askQuestion('{{ item.question }}')">
+            <span class="history-q">{{ item.question }}</span>
+            <span class="history-a">{{ item.answer_prefix }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% endblock %}
