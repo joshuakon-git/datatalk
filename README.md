@@ -4,10 +4,22 @@ A web application that lets non-technical users query business data
 in plain English. Upload any CSV, ask questions naturally,
 and get answers with automatic chart visualisation.
 
-## Demo
+## Screenshots
 
-![DataTalk Screenshot](static/img/datatalk_screenshot.png)
-
+<table>
+  <tr>
+    <td><img src="static/img/channel_comparison.png" width="400"/></td>
+    <td><img src="static/img/product_revenue.png" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="static/img/profit_margin.png" width="400"/></td>
+    <td><img src="static/img/return_product.png" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="static/img/revenue_month.png" width="400"/></td>
+    <td><img src="static/img/revenue_region.png" width="400"/></td>
+  </tr>
+</table>
 
 ## What it does
 
