@@ -237,3 +237,14 @@ tr:hover td { background: #f8fafc; }
 .loading .chart-container { display: none; }
 .loading #tableContainer { display: none; }
 
+.explanation-text {
+    font-size: 0.9rem;
+    color: #475569;
+    line-height: 1.6;
+    margin-top: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: #f8fafc;
+    border-left: 3px solid #4F46E5;
+    border-radius: 0 8px 8px 0;
+}
+

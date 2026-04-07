@@ -33,6 +33,7 @@ function submitQuestion(question) {
     })
     .then(r => r.json())
     .then(data => {
+        console.log('API response:', data);
         btn.textContent = 'Ask';
         btn.disabled = false;
         resultSection.classList.remove('loading');
@@ -58,6 +59,19 @@ function submitQuestion(question) {
 function displayResult(data) {
     document.getElementById('resultSection').style.display = 'block';
     document.getElementById('answerText').textContent = data.answer;
+
+    // Show explanation if present
+    const existingExplanation = document.getElementById('explanationText');
+    if (existingExplanation) existingExplanation.remove();
+
+    if (data.explanation) {
+        const explanation = document.createElement('p');
+        explanation.id = 'explanationText';
+        explanation.className = 'explanation-text';
+        explanation.textContent = data.explanation;
+        document.getElementById('answerText').after(explanation);
+    }
+
     document.getElementById('tableContainer').innerHTML = '';
 
     if (currentChart) {
@@ -67,15 +81,33 @@ function displayResult(data) {
 
     const canvas = document.getElementById('myChart');
 
-    if (data.chart_type === 'table' || !data.rows.length) {
+    if (data.chart_type === 'table' || !data.rows || !data.rows.length) {
         canvas.style.display = 'none';
-        renderTable(data.columns, data.rows);
+        if (data.rows && data.rows.length) {
+            renderTable(data.columns, data.rows);
+        }
         return;
     }
 
     canvas.style.display = 'block';
-    const labels = data.rows.map(r => Object.values(r)[0]);
-    const values = data.rows.map(r => Object.values(r)[1]);
+
+    // Use server-provided column hints, fall back to first/last columns
+    const labelCol = data.chart_label_col || Object.keys(data.rows[0])[0];
+    const valueCol = data.chart_value_col || Object.keys(data.rows[0])[1];
+
+    // Sort rows chronologically for time-based labels
+    const isTimeSeries = data.rows.every(r => 
+    /^\d{4}/.test(String(r[labelCol]))
+    );
+
+    const sortedRows = isTimeSeries 
+    ? [...data.rows].sort((a, b) => 
+        String(a[labelCol]).localeCompare(String(b[labelCol])))
+    : data.rows;
+
+
+    const labels = sortedRows.map(r => r[labelCol]);
+    const values = sortedRows.map(r => r[valueCol]);
 
     const colours = [
         '#4F46E5','#7C3AED','#2563EB','#059669',
@@ -102,7 +134,25 @@ function displayResult(data) {
             responsive: true,
             plugins: {
                 legend: { display: data.chart_type === 'pie' }
-            }
+            },
+            scales: data.chart_type !== 'pie' ? {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            if (value >= 1000) {
+                                return '£' + value.toLocaleString();
+                            }
+                            if (value >= 1 || value === 0) {
+                                return value % 1 !== 0 ?
+                                    value.toFixed(2) : value;
+                            }
+                            // Small decimals - show as-is without % suffix
+                            return value.toFixed(2);
+                        }
+                    }
+                }
+            } : {}
         }
     });
 }
@@ -110,11 +160,19 @@ function displayResult(data) {
 function renderTable(columns, rows) {
     if (!rows.length) return;
     let html = '<table><thead><tr>';
-    columns.forEach(col => html += `<th>${col}</th>`);
+    columns.forEach(col => {
+        html += `<th>${col.replace(/_/g, ' ')}</th>`;
+    });
     html += '</tr></thead><tbody>';
     rows.forEach(row => {
         html += '<tr>';
-        columns.forEach(col => html += `<td>${row[col] ?? ''}</td>`);
+        columns.forEach(col => {
+            let val = row[col] ?? '';
+            if (typeof val === 'number' && val % 1 !== 0) {
+                val = val.toFixed(2);
+            }
+            html += `<td>${val}</td>`;
+        });
         html += '</tr>';
     });
     html += '</tbody></table>';
