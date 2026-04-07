@@ -130,14 +130,17 @@ python app.py
 Visit `http://127.0.0.1:5000`
 
 ## Project structure
+```
 datatalk/
 ├── app.py              # Flask routes and core logic
 ├── config.py           # Configuration and environment variables
 ├── demo_data.py        # Demo CSV dataset
 ├── requirements.txt    # Python dependencies
 ├── static/
-│   ├── css/style.css   # Styling
-│   └── js/charts.js    # Chart rendering and query logic
+│   ├── css/
+│   │   └── style.css   # Styling
+│   └── js/
+│       └── charts.js   # Chart rendering and query logic
 ├── templates/
 │   ├── layout.html     # Base template
 │   ├── index.html      # Upload page
