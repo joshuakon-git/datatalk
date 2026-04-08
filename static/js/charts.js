@@ -1,3 +1,6 @@
+// AI-assisted: chart rendering logic, column selection fallback,
+// and y-axis formatting callback developed with AI assistance.
+
 let currentChart = null;
 
 function askQuestion(question) {

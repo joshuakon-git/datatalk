@@ -1,3 +1,6 @@
+# AI tools (Claude by Anthropic) were used during development to support
+# debugging and problem solving, in accordance with CS50's academic honesty policy.
+
 import os
 import json
 import sqlite3
@@ -22,6 +25,7 @@ def get_db():
     os.makedirs('instance', exist_ok=True)
     return sqlite3.connect(db_path)
 
+# AI-assisted: dynamic schema detection and column name normalisation
 def load_csv_to_db(filepath):
     """Load any CSV into SQLite, auto-detecting schema."""
     df = pd.read_csv(filepath)
@@ -51,6 +55,7 @@ def get_schema_string(df):
             for col, dtype in df.dtypes.items()]
     return ", ".join(cols)
 
+# AI-assisted: date range detection logic
 def get_data_summary(df):
     """Generate a human-readable summary of the uploaded data."""
     summary = {
@@ -120,6 +125,10 @@ def dashboard():
                            summary=summary,
                            history=history)
 
+# AI-assisted: two-stage prompt engineering approach, question intent
+# detection logic, and smart column selection algorithm were designed
+# with AI assistance.
+
 @app.route('/query', methods=['POST'])
 def query():
     if 'schema' not in session:
@@ -139,6 +148,7 @@ def query():
     is_ranking_question = any(kw in question.lower() for kw in ranking_keywords)
 
     # First API call: generate SQL and chart metadata
+    # AI-assisted: prompt structure and SQL generation instructions
     prompt = f"""You are a SQL and data analysis expert.
 
 The user has uploaded a CSV file loaded into a SQLite table called 'user_data'.
@@ -235,7 +245,8 @@ Return ONLY the JSON object. No markdown, no backticks, no preamble."""
         numeric_columns = [c for c in columns
                           if any(isinstance(r.get(c), (int, float))
                                  for r in rows)]
-
+        
+        # AI-assisted: scoring algorithm for selecting the most meaningful chart column
         def priority_score(col):
             col_lower = col.lower()
             # Exact match gets highest score
@@ -315,6 +326,7 @@ Return ONLY the JSON object. No markdown, no backticks, no preamble."""
             )
 
         # Second API call: generate explanation from actual results
+        # AI-assisted: explanation prompt structure and grounding instructions
         explanation_prompt = f"""You are a data analyst explaining query results to a business user.
 
 The user asked: "{question}"
